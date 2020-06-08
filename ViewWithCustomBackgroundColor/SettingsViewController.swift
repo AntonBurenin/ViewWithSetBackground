@@ -21,9 +21,7 @@ class SettingsViewController: UIViewController {
     @IBOutlet weak var blueSlider: UISlider!
     
     @IBOutlet var sliders: [UISlider]!
-    
     @IBOutlet var componentLabels: [UILabel]!
-    
     @IBOutlet var componentTextFields: [UITextField]!
     
     var backgroundColor: UIColor!
@@ -39,16 +37,18 @@ class SettingsViewController: UIViewController {
     }
 
     @IBAction func sliderChanged() {
-        setLabels()
         setTextFields()
-        customView.backgroundColor = getColor()
+        updateLabelsAndColor()
     }
     
     @IBAction func doneButtonPressed() {
         delegate.setColor(getColor())
         dismiss(animated: true)
     }
-    
+}
+
+// MARK: - Private methods
+extension SettingsViewController {
     private func getColor() -> UIColor {
         return UIColor(red: CGFloat(redSlider.value),
                        green: CGFloat(greenSlider.value),
@@ -56,22 +56,20 @@ class SettingsViewController: UIViewController {
                        alpha: 1)
     }
     
+    private func string(value: Float) -> String {
+        return String(format: "%.2f", value)
+    }
+    
     private func setLabels() {
         for (componentLabel, slider) in zip(componentLabels, sliders) {
-            componentLabel.text = String(format: "%.2f", slider.value)
+            componentLabel.text = string(value: slider.value)
         }
     }
     
     private func setTextFields() {
         for (componentTextField, slider) in zip(componentTextFields, sliders) {
-            componentTextField.text = String(format: "%.2f", slider.value)
+            componentTextField.text = string(value: slider.value)
             componentTextField.delegate = self
-        }
-    }
-    
-    private func setSlidersValue(components: [Float]) {
-        for (slider, component) in zip(sliders, componentTextFields) {
-            slider.value = Float(component.text ?? "0") ?? 0
         }
     }
     
@@ -94,7 +92,7 @@ class SettingsViewController: UIViewController {
         let doneButton = UIBarButtonItem(title: "Done",
                                          style: .done,
                                          target: self,
-                                         action: #selector(dismissKeybord))
+                                         action: #selector(hideKeybord))
         toolbar.setItems([doneButton], animated: true)
         toolbar.isUserInteractionEnabled = true
         for textField in componentTextFields {
@@ -102,25 +100,56 @@ class SettingsViewController: UIViewController {
         }
     }
     
-    @objc private func dismissKeybord() {
+    @objc private func hideKeybord() {
         view.endEditing(true)
         
     }
     
+    private func updateLabelsAndColor() {
+        setLabels()
+        customView.backgroundColor = getColor()
+    }
+    
     private func setStartState() {
         setSliders()
-        setLabels()
         setTextFields()
         createToolbar()
         customView.layer.cornerRadius = 10
-        customView.backgroundColor = getColor()
+        updateLabelsAndColor()
     }
 }
 
+// MARK: - UIAlertController
+extension SettingsViewController {
+    private func showAlert(with title: String,
+                           and message: String,
+                           for textField: UITextField) {
+        let alert = UIAlertController(title: title,
+                                      message: message,
+                                      preferredStyle: .alert)
+        let okAction = UIAlertAction(title: "OK", style: .default) { _ in
+            textField.text = self.string(value: self.sliders[textField.tag].value)
+            textField.becomeFirstResponder()
+        }
+        alert.addAction(okAction)
+        present(alert, animated: true)
+    }
+}
+
+// MARK: - TextFieldDelegate
 extension SettingsViewController:UITextFieldDelegate {
     func textFieldDidEndEditing(_ textField: UITextField) {
-        sliders[textField.tag].value = Float(textField.text ?? "0") ?? 0
-        setLabels()
-        customView.backgroundColor = getColor()
+        guard
+            let text = textField.text,
+            let value = Float(text),
+            value <= 1,
+            value >= 0
+        else {
+                showAlert(with: "Warning!", and: "Введите значение от 0 до 1", for: textField)
+                return
+        }
+        sliders[textField.tag].value = value
+        textField.text = string(value: sliders[textField.tag].value)    //на случай если введено больше 2 знаков после запятой
+        updateLabelsAndColor()
     }
 }
